@@ -1,0 +1,7 @@
+{
+  "variants": {
+    "": {
+      "model": "umbrella:block/placed_umbrella_block"
+    }
+  }
+}

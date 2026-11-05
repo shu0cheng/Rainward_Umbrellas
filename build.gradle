@@ -1,0 +1,78 @@
+plugins {
+    id 'java'
+    id 'net.neoforged.moddev' version '2.0.148'
+}
+
+group = 'com.shu0cheng.umbrellamod'
+version = '1.0.0'
+base {
+    archivesName = 'umbrella'
+}
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}
+
+repositories {
+    maven { url = 'https://repo.stellardrift.ca/maven/internal/' }
+    mavenCentral()
+    maven { url = 'https://maven.neoforged.net/releases' }
+    maven { url = 'https://repo1.maven.org/maven2/' }
+}
+
+dependencies {
+    // GeckoLib is loaded from the test instance at runtime; keep it for compilation.
+    compileOnly files('libs/geckolib-neoforge-1.21.1-4.9.3.jar')
+}
+
+neoForge {
+    version = '21.1.264'
+
+    runs {
+        client {
+            client()
+        }
+        server {
+            server()
+        }
+    }
+
+    mods {
+        umbrella {
+            sourceSet sourceSets.main
+        }
+    }
+}
+
+def modMetadataProperties = [
+        mod_id                 : 'umbrella',
+        mod_name               : 'Umbrella',
+        mod_version            : project.version.toString(),
+        mod_license            : 'All Rights Reserved',
+        neo_version            : '21.1.264',
+        minecraft_version      : '1.21.1',
+        minecraft_version_range: '[1.21.1]',
+        loader_version_range   : '[1,)'
+]
+
+def generateModMetadata = tasks.register('generateModMetadata', Copy) {
+    from 'src/main/templates'
+    into layout.buildDirectory.dir('generated/sources/modMetadata')
+    expand modMetadataProperties
+}
+
+sourceSets.main.resources.srcDir generateModMetadata
+
+tasks.named('processResources') {
+    dependsOn generateModMetadata
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+}
+
+tasks.named('jar') {
+    archiveBaseName = 'umbrella'
+}

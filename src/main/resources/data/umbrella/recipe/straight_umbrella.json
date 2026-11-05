@@ -1,0 +1,14 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "category": "equipment",
+  "ingredients": [
+    { "item": "minecraft:stick" },
+    { "item": "minecraft:iron_ingot" },
+    { "item": "minecraft:black_wool" },
+    { "item": "minecraft:black_wool" }
+  ],
+  "result": {
+    "id": "umbrella:straight_umbrella",
+    "count": 1
+  }
+}

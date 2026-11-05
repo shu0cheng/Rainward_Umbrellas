@@ -1,0 +1,44 @@
+{
+  "rain_on_umbrella": {
+    "subtitle": "subtitles.umbrella.rain_on_umbrella",
+    "sounds": [
+      {
+        "name": "umbrella:rain_on_umbrella_1",
+        "stream": true,
+        "attenuation_distance": 16
+      },
+      {
+        "name": "umbrella:rain_on_umbrella_2",
+        "stream": true,
+        "attenuation_distance": 16
+      },
+      {
+        "name": "umbrella:rain_on_umbrella_3",
+        "stream": true,
+        "attenuation_distance": 16
+      },
+      {
+        "name": "umbrella:rain_on_umbrella_4",
+        "stream": true,
+        "attenuation_distance": 16
+      }
+    ]
+  },
+  "umbrella_open": {
+    "subtitle": "subtitles.umbrella.open",
+    "sounds": [
+      {
+        "name": "umbrella:umbrella_open"
+      },
+      {
+        "name": "umbrella:umbrella_open_1"
+      },
+      {
+        "name": "umbrella:umbrella_open_2"
+      },
+      {
+        "name": "umbrella:umbrella_open_3"
+      }
+    ]
+  }
+}
