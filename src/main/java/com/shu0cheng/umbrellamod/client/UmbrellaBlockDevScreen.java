@@ -17,11 +17,9 @@ import java.util.function.Supplier;
 /** DEVELOPMENT ONLY. In-game placement tuner for the placed umbrella block models. */
 public final class UmbrellaBlockDevScreen extends Screen {
     private static final UmbrellaType[] TYPES = {
-            UmbrellaType.TELESCOPIC, UmbrellaType.STRAIGHT, UmbrellaType.OIL_PAPER
+            UmbrellaType.TELESCOPIC, UmbrellaType.STRAIGHT, UmbrellaType.OIL_PAPER, UmbrellaType.BAMBOO_OIL_PAPER
     };
-    private static final String[] MODES = {
-            "开伞正放", "闭伞地面", "闭伞靠方块", "开伞倒放·上半砖", "开伞倒放·下半砖"
-    };
+    private static final String[] MODES = {"开伞正放", "闭伞地面", "闭伞靠方块", "开伞倒放·上半砖", "开伞倒放·下半砖", "视角朝下开伞", "视角朝下闭伞", "视角朝上倒立闭伞"};
 
     private final UmbrellaType type;
     private final int mode;
@@ -37,11 +35,11 @@ public final class UmbrellaBlockDevScreen extends Screen {
     }
 
     private boolean open() {
-        return mode != 1 && mode != 2;
+        return mode != 1 && mode != 2 && mode != 6 && mode != 7;
     }
 
     private boolean inverted() {
-        return mode >= 3;
+        return mode == 3 || mode == 4 || mode == 7;
     }
 
     private boolean half() {
@@ -57,13 +55,19 @@ public final class UmbrellaBlockDevScreen extends Screen {
     }
 
     private String variant() {
+        if (mode == 5) return "down_open";
+        if (mode == 6) return "down_closed";
+        if (mode == 7) return "closed_inverted";
+        if (mode == 0) return "down_open";
+        if (mode == 1) return "down_closed";
+        if (mode == 6) return "closed_inverted";
         if (inverted()) return "inverted";
-        return selector == 0 ? "cardinal" : "diagonal";
+        return selector == 0 ? "front" : (selector == 1 ? "diagonal" : "slight");
     }
 
     private String selectorName() {
         if (inverted()) return "无方向（只看上下半砖）";
-        return selector == 0 ? "正面" : "斜面";
+        return selector == 0 ? "正面" : (selector == 1 ? "正斜面" : "稍斜面");
     }
 
     @Override
@@ -83,19 +87,19 @@ public final class UmbrellaBlockDevScreen extends Screen {
         ).bounds(right, 16, 150, 20).build());
         if (!inverted()) {
         addRenderableWidget(Button.builder(Component.literal("调整: " + selectorName()), b -> {
-            int max = 2;
+            int max = 3;
             minecraft.setScreen(new UmbrellaBlockDevScreen(type, mode, (selector + 1) % max));
         }).bounds(left, 40, 145, 20).build());
         }
 
         UmbrellaBlockDevConfig.T t = value();
-        addSlider("X", -2, 2, t::x, v -> set(v0 -> v0.withX(v)), left, y);
-        addSlider("Y", -2, 2, t::y, v -> set(v0 -> v0.withY(v)), left, y + 22);
-        addSlider("Z", -2, 2, t::z, v -> set(v0 -> v0.withZ(v)), left, y + 44);
-        addSlider("Yaw", -180, 180, t::yaw, v -> set(v0 -> v0.withYaw(v)), right, y);
-        addSlider("Pitch", -180, 180, t::pitch, v -> set(v0 -> v0.withPitch(v)), right, y + 22);
-        addSlider("Roll", -180, 180, t::roll, v -> set(v0 -> v0.withRoll(v)), right, y + 44);
-        addSlider("Scale", 0.1f, 3.0f, t::scale, v -> set(v0 -> v0.withScale(v)), left, y + 88);
+        addSlider("X", -2, 2, () -> value().x(), v -> set(v0 -> v0.withX(v)), left, y);
+        addSlider("Y", -2, 2, () -> value().y(), v -> set(v0 -> v0.withY(v)), left, y + 22);
+        addSlider("Z", -2, 2, () -> value().z(), v -> set(v0 -> v0.withZ(v)), left, y + 44);
+        addSlider("Yaw", -180, 180, () -> value().yaw(), v -> set(v0 -> v0.withYaw(v)), right, y);
+        addSlider("Pitch", -180, 180, () -> value().pitch(), v -> set(v0 -> v0.withPitch(v)), right, y + 22);
+        addSlider("Roll", -180, 180, () -> value().roll(), v -> set(v0 -> v0.withRoll(v)), right, y + 44);
+        addSlider("Scale", 0.1f, 3.0f, () -> value().scale(), v -> set(v0 -> v0.withScale(v)), left, y + 88);
 
         input = new EditBox(font, left, y + 116, 300, 20,
                 Component.literal("x,y,z,yaw,pitch,roll,scale"));
@@ -115,7 +119,10 @@ public final class UmbrellaBlockDevScreen extends Screen {
             if (minecraft != null) minecraft.keyboardHandler.setClipboard(UmbrellaBlockDevConfig.javaCode());
         }).bounds(left + 204, y + 140, 96, 20).build());
 
-        addRenderableWidget(Button.builder(Component.literal("保存为默认"), b -> UmbrellaBlockDevConfig.save())
+        addRenderableWidget(Button.builder(Component.literal("保存并刷新"), b -> {
+            UmbrellaBlockDevConfig.save();
+            UmbrellaClient.refreshPlacedModels();
+        })
                 .bounds(left, y + 164, 145, 20).build());
         addRenderableWidget(Button.builder(Component.literal("完成"), b -> onClose())
                 .bounds(left + 155, y + 164, 145, 20).build());
@@ -147,6 +154,7 @@ public final class UmbrellaBlockDevScreen extends Screen {
                             Float.parseFloat(p[2]), Float.parseFloat(p[3]), Float.parseFloat(p[4]),
                             Float.parseFloat(p[5]), Float.parseFloat(p[6])));
             UmbrellaBlockDevConfig.save();
+            UmbrellaClient.refreshPlacedModels();
         } catch (Exception ignored) {
         }
     }
@@ -162,6 +170,7 @@ public final class UmbrellaBlockDevScreen extends Screen {
     @Override
     public void onClose() {
         UmbrellaBlockDevConfig.save();
+        UmbrellaClient.refreshPlacedModels();
         if (minecraft != null) minecraft.setScreen(null);
     }
 
@@ -201,6 +210,7 @@ public final class UmbrellaBlockDevScreen extends Screen {
         @Override
         protected void applyValue() {
             setter.accept(min + (float) value * (max - min));
+            updateMessage();
         }
     }
 }

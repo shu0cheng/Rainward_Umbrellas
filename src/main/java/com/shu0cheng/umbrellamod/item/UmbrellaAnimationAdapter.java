@@ -1,52 +1,38 @@
 package com.shu0cheng.umbrellamod.item;
 
-import com.shu0cheng.umbrellamod.registry.ModComponents;
-import net.minecraft.world.item.ItemStack;
-import software.bernie.geckolib.animation.AnimatableManager;
-
-import java.util.IdentityHashMap;
-import java.util.HashMap;
 import java.util.Map;
+import java.util.WeakHashMap;
 import java.util.concurrent.atomic.AtomicLong;
+import net.minecraft.world.item.ItemStack;
+import software.bernie.geckolib.animatable.GeoItem;
 
-/**
- * Per-ItemStack animation identity and one-shot trigger adapter.
- *
- * <p>GeckoLib reuses a single animatable instance for an Item.  That makes two
- * umbrellas of the same type share one animation manager unless every stack has
- * its own stable id.  The renderer and this adapter must use the same id.</p>
- */
 public final class UmbrellaAnimationAdapter {
-    private static final Map<ItemStack, Long> IDS = new IdentityHashMap<>();
-    private static final Map<Long, Boolean> OPEN = new HashMap<>();
-    private static final AtomicLong NEXT = new AtomicLong(1_000_000L);
+   // Display identities are weak and client-only. They never override item state.
+   private static final Map<ItemStack, long[]> LOCAL_IDS = new WeakHashMap<>();
+   private static final AtomicLong NEXT_LOCAL_ID = new AtomicLong(-1L);
 
-    private UmbrellaAnimationAdapter() {
-    }
+   private UmbrellaAnimationAdapter() {
+   }
 
-    public static long id(ItemStack stack) {
-        if (stack == null || stack.isEmpty()) return 0L;
-        return IDS.computeIfAbsent(stack, s -> NEXT.getAndIncrement());
-    }
+   public static long id(ItemStack stack, boolean display) {
+      if (stack == null || stack.isEmpty()) {
+         return Long.MIN_VALUE;
+      }
 
-    public static boolean open(ItemStack stack) {
-        if (stack == null) return false;
-        return UmbrellaItem.isOpen(stack);
-    }
+      // GeckoLib persists its server counter; restarting cannot reuse old IDs.
+      long serverId = GeoItem.getId(stack);
+      if (!display && serverId != Long.MAX_VALUE) {
+         return serverId;
+      }
 
-    public static void setOpen(ItemStack stack, boolean open) {
-        if (stack == null) return;
-        OPEN.put(id(stack), open);
-    }
+      // Server IDs are non-negative. GUI and unassigned stacks use negative IDs.
+      long[] ids = LOCAL_IDS.computeIfAbsent(stack,
+         ignored -> new long[]{NEXT_LOCAL_ID.getAndDecrement(), NEXT_LOCAL_ID.getAndDecrement()});
+      return ids[display ? 1 : 0];
+   }
 
-    public static void trigger(UmbrellaItem item, ItemStack stack, boolean open) {
-        try {
-            long id = id(stack);
-            AnimatableManager<?> manager = item.geoCache().getManagerForId(id);
-            if (manager != null) {
-                manager.tryTriggerAnimation("main", open ? "open" : "close");
-            }
-        } catch (Exception ignored) {
-        }
-    }
+   public static void clear() {
+      LOCAL_IDS.clear();
+      NEXT_LOCAL_ID.set(-1L);
+   }
 }

@@ -16,15 +16,12 @@ java {
 }
 
 repositories {
-    maven { url = 'https://repo.stellardrift.ca/maven/internal/' }
     mavenCentral()
     maven { url = 'https://maven.neoforged.net/releases' }
-    maven { url = 'https://repo1.maven.org/maven2/' }
 }
 
 dependencies {
-    // GeckoLib is loaded from the test instance at runtime; keep it for compilation.
-    compileOnly files('libs/geckolib-neoforge-1.21.1-4.9.3.jar')
+    implementation files('libs/geckolib-neoforge-1.21.1-4.9.3.jar')
 }
 
 neoForge {

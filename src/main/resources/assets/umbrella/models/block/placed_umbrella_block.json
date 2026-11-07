@@ -1,6 +1,12 @@
 {
+  "loader": "umbrella:static_umbrella",
+  "ambientocclusion": true,
+  "render_type": "minecraft:cutout",
   "textures": {
-    "particle": "umbrella:item/telescopic_umbrella"
-  },
-  "elements": []
+    "particle": "umbrella:item/telescopic_umbrella",
+    "telescopic": "umbrella:item/telescopic_umbrella",
+    "straight": "umbrella:item/straight_umbrella",
+    "oil_paper": "umbrella:item/oil_paper_umbrella",
+    "bamboo_oil_paper": "umbrella:item/bamboo_oil_paper_umbrella"
+  }
 }

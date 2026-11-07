@@ -8,6 +8,8 @@
   "tooltip.umbrella.open": "Open",
   "tooltip.umbrella.closed": "Closed",
   "tooltip.umbrella.hint": "Right-click to open / close",
+  "tooltip.umbrella.placement": "Sneak-use: look down to stand, level to lean, up to hang",
+  "block.umbrella.umbrella_part": "Umbrella",
   "umbrella.config.title": "Umbrella Transform",
   "umbrella.config.mode.first": "Mode: First Person",
   "umbrella.config.mode.third": "Mode: Third Person",
@@ -33,5 +35,7 @@
   "umbrella.config.first_person.world": "First person: overhead, yaw only (on)",
   "block.umbrella.telescopic_umbrella_block": "Placed Telescopic Umbrella",
   "block.umbrella.straight_umbrella_block": "Placed Straight Umbrella",
-  "block.umbrella.oil_paper_umbrella_block": "Placed Oil-Paper Umbrella"
+  "block.umbrella.oil_paper_umbrella_block": "Placed Oil-Paper Umbrella",
+  "item.umbrella.bamboo_oil_paper_umbrella": "Bamboo Green Oil Paper Umbrella",
+  "block.umbrella.bamboo_oil_paper_umbrella_block": "Placed Bamboo Green Oil Paper Umbrella"
 }

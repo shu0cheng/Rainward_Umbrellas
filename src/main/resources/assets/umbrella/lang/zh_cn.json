@@ -8,6 +8,8 @@
   "tooltip.umbrella.open": "已撑开",
   "tooltip.umbrella.closed": "已收拢",
   "tooltip.umbrella.hint": "右键开伞 / 收伞",
+  "tooltip.umbrella.placement": "潜行右键放置：俯视竖直、平视斜放、仰视倒挂",
+  "block.umbrella.umbrella_part": "雨伞",
   "umbrella.config.title": "雨伞模型调整",
   "umbrella.config.mode.first": "模式：第一人称",
   "umbrella.config.mode.third": "模式：第三人称",
@@ -33,5 +35,7 @@
   "umbrella.config.first_person.world": "第一人称：头顶固定，仅左右跟随（开）",
   "block.umbrella.telescopic_umbrella_block": "放置的伸缩伞",
   "block.umbrella.straight_umbrella_block": "放置的直杆伞",
-  "block.umbrella.oil_paper_umbrella_block": "放置的油纸伞"
+  "block.umbrella.oil_paper_umbrella_block": "放置的油纸伞",
+  "item.umbrella.bamboo_oil_paper_umbrella": "竹青油纸伞",
+  "block.umbrella.bamboo_oil_paper_umbrella_block": "放置的竹青油纸伞"
 }

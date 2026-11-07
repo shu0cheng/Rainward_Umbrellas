@@ -1,221 +1,173 @@
 package com.shu0cheng.umbrellamod.item;
 
-import com.shu0cheng.umbrellamod.UmbrellaMod;
+import com.shu0cheng.umbrellamod.block.ModBlocks;
+import com.shu0cheng.umbrellamod.block.PlacedUmbrellaBlock;
+import com.shu0cheng.umbrellamod.block.UmbrellaStructure;
+import com.shu0cheng.umbrellamod.client.UmbrellaAnimation;
 import com.shu0cheng.umbrellamod.registry.ModComponents;
 import com.shu0cheng.umbrellamod.registry.ModSounds;
-import software.bernie.geckolib.animatable.GeoItem;
-import software.bernie.geckolib.animatable.instance.AnimatableInstanceCache;
-import software.bernie.geckolib.animatable.instance.SingletonAnimatableInstanceCache;
-import software.bernie.geckolib.animation.AnimatableManager;
-import software.bernie.geckolib.animation.AnimationController;
-import software.bernie.geckolib.animation.AnimationState;
-import software.bernie.geckolib.constant.DataTickets;
-import software.bernie.geckolib.animation.PlayState;
-import software.bernie.geckolib.animation.RawAnimation;
-import net.minecraft.world.item.ItemDisplayContext;
+import java.util.List;
+import java.util.Map;
+import java.util.WeakHashMap;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.InteractionHand;
-import net.minecraft.world.InteractionResultHolder;
 import net.minecraft.world.InteractionResult;
-import net.minecraft.world.item.context.UseOnContext;
-import net.minecraft.core.BlockPos;
-import net.minecraft.util.Mth;
-import net.minecraft.world.level.block.state.BlockState;
-import com.shu0cheng.umbrellamod.block.ModBlocks;
-import com.shu0cheng.umbrellamod.block.PlacedUmbrellaBlock;
-import com.shu0cheng.umbrellamod.registry.ModItems;
-import net.minecraft.world.entity.Entity;
+import net.minecraft.world.InteractionResultHolder;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemDisplayContext;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.TooltipFlag;
+import net.minecraft.world.item.Item.Properties;
+import net.minecraft.world.item.Item.TooltipContext;
+import net.minecraft.world.item.context.UseOnContext;
+import net.minecraft.world.item.context.BlockPlaceContext;
 import net.minecraft.world.level.Level;
+import software.bernie.geckolib.animatable.GeoItem;
+import software.bernie.geckolib.animatable.instance.AnimatableInstanceCache;
+import software.bernie.geckolib.animatable.instance.SingletonAnimatableInstanceCache;
+import software.bernie.geckolib.animation.AnimationController;
+import software.bernie.geckolib.animation.AnimationState;
+import software.bernie.geckolib.animation.PlayState;
+import software.bernie.geckolib.animation.RawAnimation;
+import software.bernie.geckolib.animation.AnimatableManager.ControllerRegistrar;
+import software.bernie.geckolib.constant.DataTickets;
 
-import java.util.List;
-import java.util.Map;
-import java.util.EnumMap;
-import java.util.HashMap;
-
-/**
- * An umbrella.  Right click toggles between the folded (closed) and deployed
- * (open) state.  While closed the item is rendered folded, matching the
- * inventory icon.
- */
 public class UmbrellaItem extends Item implements GeoItem {
-    private final AnimatableInstanceCache geoCache = new SingletonAnimatableInstanceCache(this);
-    private static final Map<UmbrellaType, Boolean> CLIENT_OPEN = new EnumMap<>(UmbrellaType.class);
-    private static final Map<Long, AnimPhase> ANIM_PHASES = new HashMap<>();
-    public static final ThreadLocal<Boolean> STATIC_RENDER = ThreadLocal.withInitial(() -> false);
-    private static final RawAnimation POSE_OPEN_ANIM = RawAnimation.begin().thenLoop("pose_open");
-    private static final RawAnimation POSE_CLOSED_ANIM = RawAnimation.begin().thenLoop("pose_closed");
-    private static final RawAnimation DISPLAY_OPEN_ANIM = RawAnimation.begin().thenLoop("display_open");
-    private static final RawAnimation OPEN_ANIM = RawAnimation.begin().thenPlayAndHold("open");
-    private static final RawAnimation CLOSE_ANIM = RawAnimation.begin().thenPlayAndHold("close");
-    private final UmbrellaType type;
+   private final AnimationCache geoCache = new AnimationCache(this);
+   private final Map<AnimationController<?>, UmbrellaAnimationState> animationStates = new WeakHashMap<>();
+   public static final int TOGGLE_COOLDOWN_TICKS = 24;
+   private static final RawAnimation POSE_OPEN_ANIM = RawAnimation.begin().thenLoop("pose_open");
+   private static final RawAnimation POSE_CLOSED_ANIM = RawAnimation.begin().thenLoop("pose_closed");
+   private static final RawAnimation DISPLAY_OPEN_ANIM = RawAnimation.begin().thenLoop("display_open");
+   private static final RawAnimation OPEN_ANIM = RawAnimation.begin().thenPlay("open").thenLoop("pose_open");
+   private static final RawAnimation CLOSE_ANIM = RawAnimation.begin().thenPlay("close").thenLoop("pose_closed");
+   private final UmbrellaType type;
 
-    public UmbrellaItem(UmbrellaType type, Properties properties) {
-        super(properties);
-        this.type = type;
-    }
+   public UmbrellaItem(UmbrellaType type, Properties properties) {
+      super(properties);
+      this.type = type;
+   }
 
-    @Override
-    public void registerControllers(AnimatableManager.ControllerRegistrar controllers) {
-        AnimationController<UmbrellaItem> controller = new AnimationController<>(this, "main", 0, this::animationState);
-        controllers.add(controller);
-    }
+   public void registerControllers(ControllerRegistrar controllers) {
+      AnimationController<UmbrellaItem> controller = new AnimationController<>(this, "main", 0, this::animationState);
+      controllers.add(controller);
+   }
 
-    @Override
-    public AnimatableInstanceCache getAnimatableInstanceCache() {
-        return geoCache;
-    }
+   public AnimatableInstanceCache getAnimatableInstanceCache() {
+      return this.geoCache;
+   }
 
-    public AnimatableInstanceCache geoCache() {
-        return geoCache;
-    }
+   public AnimatableInstanceCache geoCache() {
+      return this.geoCache;
+   }
 
-    public UmbrellaType getUmbrellaType() {
-        return type;
-    }
+   public UmbrellaType getUmbrellaType() {
+      return this.type;
+   }
 
-    @Override
-    public InteractionResultHolder<ItemStack> use(Level level, Player player, InteractionHand hand) {
-        if (player.getCooldowns().isOnCooldown(this)) {
-            return InteractionResultHolder.pass(player.getItemInHand(hand));
-        }
-        ItemStack stack = player.getItemInHand(hand);
-        boolean open = isOpen(stack);
-        CLIENT_OPEN.put(type, !open);
-        UmbrellaAnimationAdapter.id(stack);
-        if (!level.isClientSide) {
-            stack.set(ModComponents.UMBRELLA_STATE.get(), new UmbrellaState(!open, level.getGameTime()));
-            if (open) {
-                player.playSound(SoundEvents.WOOL_BREAK, 0.85F, 1.15F);
-            } else {
-                level.playSound(null, player.getX(), player.getEyeY(), player.getZ(),
-                        ModSounds.UMBRELLA_OPEN.get(), SoundSource.PLAYERS, 0.9F, 1.0F);
-            }
-        }
-        player.getCooldowns().addCooldown(this, 24);
-        return InteractionResultHolder.pass(stack);
-    }
+   public InteractionResultHolder<ItemStack> use(Level level, Player player, InteractionHand hand) {
+      toggle(player, hand);
+      // Consume even during cooldown, so a main-hand umbrella cannot fall through
+      // and unexpectedly use the offhand. CONSUME also avoids vanilla hand swing.
+      return InteractionResultHolder.consume(player.getItemInHand(hand));
+   }
 
-    @Override
-    public InteractionResult useOn(UseOnContext context) {
-        Player player = context.getPlayer();
-        if (player == null || !player.isShiftKeyDown()) {
-            return InteractionResult.PASS;
-        }
-        Level level = context.getLevel();
-        ItemStack stack = context.getItemInHand();
-        BlockPos placePos = context.getClickedPos().relative(context.getClickedFace());
-        if (!level.getBlockState(placePos).canBeReplaced()) {
-            return InteractionResult.FAIL;
-        }
-        boolean open = isOpen(stack);
-        boolean inverted = open && player.getXRot() < -45.0F;
-        boolean leaning = !open && context.getClickedFace().getAxis().isHorizontal()
-                && level.getBlockState(placePos.below()).isSolid();
-        if (!inverted && !leaning && !level.getBlockState(placePos.below()).isSolid()) {
-            return InteractionResult.FAIL;
-        }
-        boolean half = inverted
-                && context.getClickedFace() != net.minecraft.core.Direction.DOWN
-                && context.getClickedFace() != net.minecraft.core.Direction.UP
-                && (context.getClickLocation().y - context.getClickedPos().getY()) < 0.5D;
-        int rotation = Mth.floor((player.getYRot() + 180.0F) * 16.0F / 360.0F + 0.5F) & 15;
-        BlockState state = ModBlocks.forType(type).defaultBlockState()
-                .setValue(PlacedUmbrellaBlock.ROTATION, rotation)
-                .setValue(PlacedUmbrellaBlock.OPEN, open)
-                .setValue(PlacedUmbrellaBlock.INVERTED, inverted)
-                .setValue(PlacedUmbrellaBlock.HALF, half)
-                .setValue(PlacedUmbrellaBlock.LEANING, leaning);
-        if (!level.isClientSide) {
-            level.setBlock(placePos, state, 3);
-            level.playSound(null, placePos, state.getBlock().defaultBlockState().getSoundType().getPlaceSound(),
-                    net.minecraft.sounds.SoundSource.BLOCKS, 1.0F, 1.0F);
-            if (!player.getAbilities().instabuild) {
-                stack.shrink(1);
-            }
-        }
-        return InteractionResult.sidedSuccess(level.isClientSide);
-    }
+   public boolean toggle(Player player, InteractionHand hand) {
+      ItemStack stack = player.getItemInHand(hand);
+      if (!(player.level() instanceof ServerLevel level) || player.isSpectator()
+         || stack.getItem() != this || player.getCooldowns().isOnCooldown(this)) {
+         return false;
+      }
 
-    @Override
-    public void onCraftedBy(ItemStack stack, Level level, Player player) {
-        stack.set(ModComponents.UMBRELLA_STATE.get(), new UmbrellaState(false, level.getGameTime()));
-    }
+      boolean open = !isOpen(stack);
+      GeoItem.getOrAssignId(stack, level);
+      stack.set(ModComponents.UMBRELLA_STATE.get(), new UmbrellaState(open, level.getGameTime()));
+      player.getCooldowns().addCooldown(this, TOGGLE_COOLDOWN_TICKS);
+      level.playSound(null, player.getX(), player.getEyeY(), player.getZ(),
+         open ? ModSounds.UMBRELLA_OPEN.get() : SoundEvents.WOOL_BREAK,
+         SoundSource.PLAYERS, open ? 0.9F : 0.85F, open ? 1.0F : 1.15F);
+      if (player instanceof ServerPlayer serverPlayer) {
+         serverPlayer.inventoryMenu.broadcastChanges();
+      }
+      return true;
+   }
 
-    @Override
-    public void inventoryTick(ItemStack stack, Level level, Entity entity, int slot, boolean selected) {
-        if (!stack.has(ModComponents.UMBRELLA_STATE.get()) && !level.isClientSide) {
-            stack.set(ModComponents.UMBRELLA_STATE.get(), new UmbrellaState(false, level.getGameTime()));
-        }
-    }
+   public InteractionResult useOn(UseOnContext context) {
+      Player player = context.getPlayer();
+      if (player == null || !player.isShiftKeyDown()) return InteractionResult.PASS;
+      return UmbrellaStructure.place((PlacedUmbrellaBlock)ModBlocks.forType(this.type),new BlockPlaceContext(context));
+   }
 
-    @Override
-    public boolean isFoil(ItemStack stack) {
-        return false;
-    }
+   public boolean isFoil(ItemStack stack) {
+      return false;
+   }
 
-    @Override
-    public void appendHoverText(ItemStack stack, Item.TooltipContext context, List<Component> tooltip, TooltipFlag flag) {
-        boolean open = isOpen(stack);
-        tooltip.add(Component.translatable(open ? "tooltip.umbrella.open" : "tooltip.umbrella.closed")
-                .withStyle(open ? ChatFormatting.AQUA : ChatFormatting.GRAY));
-        tooltip.add(Component.translatable("tooltip.umbrella.hint").withStyle(ChatFormatting.DARK_GRAY));
-    }
+   public void appendHoverText(ItemStack stack, TooltipContext context, List<Component> tooltip, TooltipFlag flag) {
+      boolean open = isOpen(stack);
+      tooltip.add(
+         Component.translatable(open ? "tooltip.umbrella.open" : "tooltip.umbrella.closed").withStyle(open ? ChatFormatting.AQUA : ChatFormatting.GRAY)
+      );
+      tooltip.add(Component.translatable("tooltip.umbrella.hint").withStyle(ChatFormatting.DARK_GRAY));
+      tooltip.add(Component.translatable("tooltip.umbrella.placement").withStyle(ChatFormatting.DARK_GRAY));
+   }
 
-    public static boolean isOpen(ItemStack stack) {
-        UmbrellaState state = stack.get(ModComponents.UMBRELLA_STATE.get());
-        return state != null && state.open();
-    }
+   public static boolean isOpen(ItemStack stack) {
+      if (stack == null || stack.isEmpty() || !(stack.getItem() instanceof UmbrellaItem)) {
+         return false;
+      }
+      UmbrellaState state = stack.get(ModComponents.UMBRELLA_STATE.get());
+      return state != null && state.open();
+   }
 
-    public static UmbrellaState getState(ItemStack stack) {
-        UmbrellaState state = stack.get(ModComponents.UMBRELLA_STATE.get());
-        return state == null ? new UmbrellaState(false, 0L) : state;
-    }
+   public static UmbrellaState getState(ItemStack stack) {
+      UmbrellaState state = stack.get(ModComponents.UMBRELLA_STATE.get());
+      return state == null ? new UmbrellaState(false, 0L) : state;
+   }
 
-    private PlayState animationState(AnimationState<UmbrellaItem> state) {
-        ItemStack stack = state.getData(DataTickets.ITEMSTACK);
-        ItemDisplayContext context = state.getData(DataTickets.ITEM_RENDER_PERSPECTIVE);
-        if (context == ItemDisplayContext.FIXED || context == ItemDisplayContext.GUI) {
-            return state.setAndContinue(DISPLAY_OPEN_ANIM);
-        }
-        if (STATIC_RENDER.get()) {
-            boolean staticOpen = stack != null && isOpen(stack);
-            return state.setAndContinue(staticOpen ? POSE_OPEN_ANIM : POSE_CLOSED_ANIM);
-        }
-        boolean open = UmbrellaAnimationAdapter.open(stack);
-        long id = UmbrellaAnimationAdapter.id(stack);
-        AnimPhase phase = ANIM_PHASES.get(id);
-        if (phase == null) {
-            ANIM_PHASES.put(id, new AnimPhase(open));
-            return state.setAndContinue(open ? OPEN_ANIM : POSE_CLOSED_ANIM);
-        }
-        if (phase.open != open) {
-            phase.open = open;
-        }
-        // Holding the last frame avoids returning to an empty/default pose after
-        // the one-shot animation finishes.
-        return state.setAndContinue(open ? OPEN_ANIM : CLOSE_ANIM);
-    }
+   private PlayState animationState(AnimationState<UmbrellaItem> state) {
+      ItemStack stack = (ItemStack)state.getData(DataTickets.ITEMSTACK);
+      ItemDisplayContext context = (ItemDisplayContext)state.getData(DataTickets.ITEM_RENDER_PERSPECTIVE);
+      if (context != ItemDisplayContext.FIXED && context != ItemDisplayContext.GUI) {
+         boolean open = isOpen(stack);
+         if (context == ItemDisplayContext.NONE) {
+            return state.setAndContinue(open ? POSE_OPEN_ANIM : POSE_CLOSED_ANIM);
+         }
+         UmbrellaState authoritative = getState(stack);
+         boolean recent = UmbrellaAnimation.isRecent(authoritative, this.type.animationTicks());
+         UmbrellaAnimationState observed = this.animationStates.computeIfAbsent(state.getController(), ignored -> new UmbrellaAnimationState());
+         return state.setAndContinue(switch (observed.observe(open, recent)) {
+            case POSE_OPEN -> POSE_OPEN_ANIM;
+            case POSE_CLOSED -> POSE_CLOSED_ANIM;
+            case OPEN -> OPEN_ANIM;
+            case CLOSE -> CLOSE_ANIM;
+         });
+      } else {
+         return state.setAndContinue(DISPLAY_OPEN_ANIM);
+      }
+   }
 
-    private static final class AnimPhase {
-        boolean open;
+   public void clearAnimationCache() {
+      this.animationStates.clear();
+      this.geoCache.clear();
+   }
 
-        AnimPhase(boolean open) {
-            this.open = open;
-        }
-    }
+   public static boolean isUmbrella(ItemStack stack) {
+      return !stack.isEmpty() && stack.getItem() instanceof UmbrellaItem;
+   }
 
-    public static boolean isClientOpen(UmbrellaType type) {
-        return CLIENT_OPEN.getOrDefault(type, false);
-    }
+   private static final class AnimationCache extends SingletonAnimatableInstanceCache {
+      private AnimationCache(UmbrellaItem item) {
+         super(item);
+      }
 
-    public static boolean isUmbrella(ItemStack stack) {
-        return !stack.isEmpty() && stack.getItem() instanceof UmbrellaItem;
-    }
+      private void clear() {
+         this.managers.clear();
+      }
+   }
 }
