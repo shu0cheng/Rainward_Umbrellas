@@ -1,9 +1,15 @@
 pluginManagement {
     repositories {
+        maven {
+            name = 'MojangLibraries'
+            url = 'https://libraries.minecraft.net/'
+            content { includeGroup 'com.mojang' }
+        }
+        maven { url = 'https://maven.fabricmc.net/' }
+        maven { url = 'https://maven.architectury.dev/' }
+        maven { url = 'https://maven.neoforged.net/releases/' }
         gradlePluginPortal()
-        maven { url = 'https://maven.neoforged.net/releases' }
-        mavenCentral()
     }
 }
-
 rootProject.name = 'umbrella'
+include 'common', 'fabric', 'neoforge'

@@ -1,0 +1,24 @@
+plugins { id 'com.gradleup.shadow' }
+architectury {
+    platformSetupLoomIde()
+    fabric()
+}
+apply from: rootProject.file('gradle/scripts/platform.gradle')
+repositories {
+    maven {
+        name = 'TerraformersMC'
+        url = 'https://maven.terraformersmc.com/releases/'
+        content { includeGroup 'com.terraformersmc' }
+    }
+}
+
+dependencies {
+    modImplementation "net.fabricmc:fabric-loader:${rootProject.fabric_loader_version}"
+    modImplementation "net.fabricmc.fabric-api:fabric-api:${rootProject.fabric_api_version}"
+    modImplementation "software.bernie.geckolib:geckolib-fabric-${rootProject.minecraft_version}:${rootProject.geckolib_version}"
+    common(project(path: ':common', configuration: 'namedElements')) { transitive = false }
+    shadowCommon(project(path: ':common', configuration: 'transformProductionFabric')) { transitive = false }
+
+    // Development runtime only; not required by or bundled with release jars.
+    modLocalRuntime "com.terraformersmc:modmenu:${rootProject.modmenu_version}"
+}

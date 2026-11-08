@@ -1,78 +1,47 @@
 plugins {
-    id 'java'
-    id 'net.neoforged.moddev' version '2.0.148'
+    id 'base'
+    id 'dev.architectury.loom' version '1.17.493' apply false
+    id 'architectury-plugin' version '3.5.170'
+    id 'com.gradleup.shadow' version '8.3.11' apply false
 }
 
-group = 'com.shu0cheng.umbrellamod'
-version = '1.0.0'
-base {
-    archivesName = 'umbrella'
-}
+architectury { minecraft = minecraft_version }
 
-java {
-    toolchain {
-        languageVersion = JavaLanguageVersion.of(21)
-    }
-}
-
-repositories {
-    maven { url = 'https://repo.stellardrift.ca/maven/internal/' }
-    mavenCentral()
-    maven { url = 'https://maven.neoforged.net/releases' }
-    maven { url = 'https://repo1.maven.org/maven2/' }
-}
-
-dependencies {
-    // GeckoLib is loaded from the test instance at runtime; keep it for compilation.
-    compileOnly files('libs/geckolib-neoforge-1.21.1-4.9.3.jar')
-}
-
-neoForge {
-    version = '21.1.264'
-
-    runs {
-        client {
-            client()
-        }
-        server {
-            server()
-        }
-    }
-
-    mods {
-        umbrella {
-            sourceSet sourceSets.main
+allprojects {
+    group = rootProject.maven_group
+    version = "${rootProject.mod_version}+mc${rootProject.minecraft_version}"
+    repositories {
+        mavenCentral()
+        maven {
+            name = 'GeckoLib'
+            url = 'https://dl.cloudsmith.io/public/geckolib3/geckolib/maven/'
+            content { includeGroup 'software.bernie.geckolib' }
         }
     }
 }
 
-def modMetadataProperties = [
-        mod_id                 : 'umbrella',
-        mod_name               : 'Umbrella',
-        mod_version            : project.version.toString(),
-        mod_license            : 'All Rights Reserved',
-        neo_version            : '21.1.264',
-        minecraft_version      : '1.21.1',
-        minecraft_version_range: '[1.21.1]',
-        loader_version_range   : '[1,)'
-]
-
-def generateModMetadata = tasks.register('generateModMetadata', Copy) {
-    from 'src/main/templates'
-    into layout.buildDirectory.dir('generated/sources/modMetadata')
-    expand modMetadataProperties
+subprojects {
+    apply plugin: 'dev.architectury.loom'
+    apply plugin: 'architectury-plugin'
+    apply from: rootProject.file('gradle/scripts/java.gradle')
+    base { archivesName = "${rootProject.archives_name}-${project.name}" }
+    dependencies {
+        minecraft "net.minecraft:minecraft:${rootProject.minecraft_version}"
+        mappings loom.officialMojangMappings()
+    }
 }
 
-sourceSets.main.resources.srcDir generateModMetadata
+tasks.named('build') { dependsOn ':fabric:build', ':neoforge:build' }
+tasks.named('clean') { dependsOn ':common:clean', ':fabric:clean', ':neoforge:clean' }
 
-tasks.named('processResources') {
-    dependsOn generateModMetadata
+tasks.register('collectReleaseJars', Sync) {
+    group = 'build'
+    description = 'Collects both loader release jars into build/libs.'
+    dependsOn ':fabric:remapJar', ':neoforge:remapJar'
+    from project(':fabric').tasks.named('remapJar').flatMap { it.archiveFile }
+    from project(':neoforge').tasks.named('remapJar').flatMap { it.archiveFile }
+    into layout.buildDirectory.dir('libs')
 }
+tasks.named('assemble') { dependsOn 'collectReleaseJars' }
 
-tasks.withType(JavaCompile).configureEach {
-    options.encoding = 'UTF-8'
-}
-
-tasks.named('jar') {
-    archiveBaseName = 'umbrella'
-}
+apply from: rootProject.file('gradle/scripts/verification.gradle')

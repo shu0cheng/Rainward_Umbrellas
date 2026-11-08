@@ -1,0 +1,15 @@
+plugins { id 'com.gradleup.shadow' }
+architectury {
+    platformSetupLoomIde()
+    neoForge()
+}
+apply from: rootProject.file('gradle/scripts/platform.gradle')
+repositories {
+    maven { url = 'https://maven.neoforged.net/releases/' }
+}
+dependencies {
+    neoForge "net.neoforged:neoforge:${rootProject.neoforge_version}"
+    modImplementation "software.bernie.geckolib:geckolib-neoforge-${rootProject.minecraft_version}:${rootProject.geckolib_version}"
+    common(project(path: ':common', configuration: 'namedElements')) { transitive = false }
+    shadowCommon(project(path: ':common', configuration: 'transformProductionNeoForge')) { transitive = false }
+}

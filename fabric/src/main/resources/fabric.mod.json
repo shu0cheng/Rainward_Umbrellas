@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "id": "${mod_id}",
+  "version": "${version}",
+  "name": "${mod_name}",
+  "description": "Three animated umbrellas, decorative placement and rain-on-canopy sounds.",
+  "authors": ["shu0cheng"],
+  "license": "${mod_license}",
+  "icon": "umbrella_logo.png",
+  "environment": "*",
+  "entrypoints": {
+    "main": ["com.shu0cheng.umbrellamod.fabric.UmbrellaFabric"],
+    "client": ["com.shu0cheng.umbrellamod.fabric.UmbrellaFabricClient"]
+  },
+  "mixins": ["umbrella.mixins.json"],
+  "depends": {
+    "fabricloader": ">=${fabric_loader_version}",
+    "fabric-api": ">=${fabric_api_version}",
+    "minecraft": "${minecraft_version}",
+    "java": ">=21",
+    "geckolib": ">=${geckolib_version} <5.0.0"
+  }
+}
