@@ -4,6 +4,8 @@
   "package": "com.shu0cheng.umbrellamod.mixin",
   "compatibilityLevel": "JAVA_21",
   "client": [
+    "BlockModelShaperMixin",
+    "LevelRendererMixin",
     "HumanoidModelMixin",
     "PlayerSwingMixin"
   ],

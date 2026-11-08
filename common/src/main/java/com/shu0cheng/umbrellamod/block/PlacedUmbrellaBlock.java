@@ -23,7 +23,7 @@ import net.minecraft.world.phys.shapes.Shapes;
 import net.minecraft.world.phys.shapes.VoxelShape;
 import org.jetbrains.annotations.Nullable;
 
-/** Placed umbrella decoration: no collision, rendered entirely by a BER. */
+/** A non-colliding decoration with a baked block model and saved item data. */
 public class PlacedUmbrellaBlock extends BaseEntityBlock {
     public static final IntegerProperty ROTATION = IntegerProperty.create("rotation", 0, 15);
     public static final BooleanProperty OPEN = BooleanProperty.create("open");
@@ -66,7 +66,7 @@ public class PlacedUmbrellaBlock extends BaseEntityBlock {
 
     @Override
     protected RenderShape getRenderShape(BlockState state) {
-        return RenderShape.INVISIBLE;
+        return RenderShape.MODEL;
     }
 
     @Override

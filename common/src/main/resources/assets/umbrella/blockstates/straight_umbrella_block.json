@@ -1,7 +1,10 @@
 {
   "variants": {
-    "": {
-      "model": "umbrella:block/placed_umbrella_block"
+    "open=false": {
+      "model": "umbrella:block/straight_closed"
+    },
+    "open=true": {
+      "model": "umbrella:block/straight_open"
     }
   }
 }

@@ -149,7 +149,7 @@ public final class UmbrellaBlockDevScreen extends Screen {
         super.render(graphics, mouseX, mouseY, partialTick);
         graphics.drawCenteredString(font, title, width / 2, 4, 0xFFFFFF);
         graphics.drawCenteredString(font, Component.literal("格式: x,y,z,yaw,pitch,roll,scale"), width / 2, height - 32, 0xA0A0A0);
-        graphics.drawCenteredString(font, Component.literal("开发专用 - 发布前删除"), width / 2, height - 18, 0xFF8080);
+        graphics.drawCenteredString(font, Component.literal("保存后按 F3+T 重载资源"), width / 2, height - 18, 0xFF8080);
     }
 
     @Override

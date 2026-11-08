@@ -41,7 +41,7 @@ tasks.register('verifyReleaseJars') {
                     service, 'umbrella.mixins.json', 'umbrella_logo.png',
                     'assets/umbrella/sounds.json',
                     'assets/umbrella/geo/item/telescopic_umbrella.geo.json',
-                    'assets/umbrella/animations/item/block_empty.animation.json',
+                    'assets/umbrella/models/block/telescopic_open.json',
                     'data/umbrella/recipe/oil_paper_umbrella.json',
                     loader == 'fabric' ? 'fabric.mod.json' : 'META-INF/neoforge.mods.toml'
                 ]

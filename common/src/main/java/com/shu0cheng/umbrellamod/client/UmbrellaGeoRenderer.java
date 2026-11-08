@@ -29,16 +29,6 @@ public class UmbrellaGeoRenderer extends GeoItemRenderer<UmbrellaItem> {
         this.id = id;
     }
 
-    public void renderInWorld(PoseStack pose, UmbrellaItem item, ItemStack stack,
-                              MultiBufferSource buffer, int light, int overlay) {
-        this.animatable = item;
-        this.currentItemStack = stack;
-        this.renderPerspective = ItemDisplayContext.NONE;
-        RenderType type = getRenderType(item, getTextureLocation(item), buffer, 0.0F);
-        VertexConsumer vc = buffer.getBuffer(type);
-        defaultRender(pose, item, buffer, type, vc, 0.0F, 0.0F, light);
-    }
-
     @Override
     public RenderType getRenderType(UmbrellaItem animatable, ResourceLocation texture,
                                     MultiBufferSource bufferSource, float partialTick) {
