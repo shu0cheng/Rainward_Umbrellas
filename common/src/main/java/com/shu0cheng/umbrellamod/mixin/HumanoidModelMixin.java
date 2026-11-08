@@ -39,10 +39,8 @@ public abstract class HumanoidModelMixin {
         }
         ItemStack main = player.getMainHandItem();
         ItemStack off = player.getOffhandItem();
-        boolean mainOpen = UmbrellaItem.isOpen(main)
-                || (main.getItem() instanceof UmbrellaItem item && UmbrellaItem.isClientOpen(item.getUmbrellaType()));
-        boolean offOpen = UmbrellaItem.isOpen(off)
-                || (off.getItem() instanceof UmbrellaItem item && UmbrellaItem.isClientOpen(item.getUmbrellaType()));
+        boolean mainOpen = UmbrellaItem.isUmbrella(main) && UmbrellaItem.isOpen(main);
+        boolean offOpen = UmbrellaItem.isUmbrella(off) && UmbrellaItem.isOpen(off);
         if (!mainOpen && !offOpen) {
             return;
         }
@@ -66,16 +64,12 @@ public abstract class HumanoidModelMixin {
 
     private static float openingAmount(Player player, ItemStack stack) {
         UmbrellaState state = UmbrellaItem.getState(stack);
-        if (!state.open() || player.level() == null) {
+        long now = player.level().getGameTime();
+        if (!state.open() || state.changedAt() < 0 || state.changedAt() > now) {
             return 0.0F;
         }
         UmbrellaType type = ((UmbrellaItem) stack.getItem()).getUmbrellaType();
-        float ticks = switch (type) {
-            case TELESCOPIC -> 12.0F;
-            case OIL_PAPER -> 16.0F;
-            case STRAIGHT -> 8.0F;
-        };
-        float t = Mth.clamp((player.level().getGameTime() - state.changedAt()) / ticks, 0.0F, 1.0F);
+        float t = Mth.clamp((now - state.changedAt()) / (float) type.animationTicks(), 0.0F, 1.0F);
         return Mth.sin(t * (float) Math.PI);
     }
 

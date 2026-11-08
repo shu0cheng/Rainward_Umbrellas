@@ -18,7 +18,7 @@ public final class UmbrellaRainSound extends AbstractTickableSoundInstance {
     private final Player owner;
     private float targetVolume = 0.95F;
 
-    public UmbrellaRainSound(Player owner, boolean self) {
+    public UmbrellaRainSound(Player owner) {
         super(ModSounds.RAIN_ON_UMBRELLA.get(), SoundSource.AMBIENT,
                 SoundInstance.createUnseededRandom());
         this.owner = owner;
@@ -27,10 +27,10 @@ public final class UmbrellaRainSound extends AbstractTickableSoundInstance {
         this.relative = false;
         this.volume = 0.01F;
         this.pitch = 1.0F;
-        updatePosition(owner);
+        updatePosition();
     }
 
-    public void updatePosition(Player owner) {
+    public void updatePosition() {
         this.x = owner.getX();
         this.y = owner.getEyeY() + 1.45;
         this.z = owner.getZ();

@@ -4,7 +4,6 @@ import com.shu0cheng.umbrellamod.item.UmbrellaType;
 import com.shu0cheng.umbrellamod.item.UmbrellaTransform;
 import com.shu0cheng.umbrellamod.item.UmbrellaItem;
 import com.shu0cheng.umbrellamod.network.TransformPayload;
-import com.shu0cheng.umbrellamod.registry.ModComponents;
 import net.minecraft.world.item.ItemStack;
 import com.shu0cheng.umbrellamod.network.ModNetwork;
 import net.minecraft.client.gui.GuiGraphics;
@@ -12,9 +11,9 @@ import net.minecraft.client.gui.components.AbstractSliderButton;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.world.InteractionHand;
 
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Locale;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
@@ -25,10 +24,11 @@ public final class UmbrellaConfigScreen extends Screen {
             UmbrellaType.TELESCOPIC, UmbrellaType.STRAIGHT, UmbrellaType.OIL_PAPER
     };
 
-    private final UmbrellaType type;
-    private final boolean firstPerson;
+    private UmbrellaType type;
+    private boolean firstPerson;
+    private InteractionHand editingHand;
     private ItemStack editingStack;
-    private final List<ConfigSlider> sliders = new ArrayList<>();
+    private boolean transformChanged;
 
     public UmbrellaConfigScreen(UmbrellaType type, boolean firstPerson) {
         super(Component.translatable("umbrella.config.title"));
@@ -38,14 +38,7 @@ public final class UmbrellaConfigScreen extends Screen {
 
     @Override
     protected void init() {
-        if (minecraft != null && minecraft.player != null) {
-            for (ItemStack held : new ItemStack[]{minecraft.player.getMainHandItem(), minecraft.player.getOffhandItem()}) {
-                if (held.getItem() instanceof UmbrellaItem item && item.getUmbrellaType() == type) {
-                    editingStack = held;
-                    break;
-                }
-            }
-        }
+        if (!transformChanged) selectEditingStack();
         int cx = this.width / 2;
         int left = cx - 155;
         int right = cx + 5;
@@ -54,28 +47,28 @@ public final class UmbrellaConfigScreen extends Screen {
         addRenderableWidget(Button.builder(typeName(type), b -> {
             int i = 0;
             for (int j = 0; j < TYPES.length; j++) if (TYPES[j] == type) i = j;
-            if (minecraft != null) minecraft.setScreen(new UmbrellaConfigScreen(TYPES[(i + 1) % TYPES.length], firstPerson));
+            saveChanges();
+            type = TYPES[(i + 1) % TYPES.length];
+            rebuildWidgets();
         }).bounds(left, 18, 145, 20).build());
 
         addRenderableWidget(Button.builder(
                 Component.translatable(firstPerson ? "umbrella.config.mode.first" : "umbrella.config.mode.third"),
                 b -> {
-                    if (minecraft != null) minecraft.setScreen(new UmbrellaConfigScreen(type, !firstPerson));
+                    firstPerson = !firstPerson;
+                    rebuildWidgets();
                 }).bounds(right, 18, 150, 20).build());
 
-        UmbrellaClientConfig.Transform t = firstPerson
-                ? UmbrellaClientConfig.first(type) : UmbrellaClientConfig.held(type);
-
         // Position column.
-        addSlider("umbrella.config.scale", 0.1F, 3.0F, () -> t.scale, v -> t.scale = v, left, y, 150);
-        addSlider("umbrella.config.x", -1.0F, 1.0F, () -> t.x, v -> t.x = v, left, y + 24, 150);
-        addSlider("umbrella.config.y", -1.0F, 1.0F, () -> t.y, v -> t.y = v, left, y + 48, 150);
-        addSlider("umbrella.config.z", -1.0F, 1.0F, () -> t.z, v -> t.z = v, left, y + 72, 150);
+        addSlider("umbrella.config.scale", 0.1F, 3.0F, () -> value().scale(), v -> edit(value().withScale(v)), left, y, 150);
+        addSlider("umbrella.config.x", -1.0F, 1.0F, () -> value().x(), v -> edit(value().withX(v)), left, y + 24, 150);
+        addSlider("umbrella.config.y", -1.0F, 1.0F, () -> value().y(), v -> edit(value().withY(v)), left, y + 48, 150);
+        addSlider("umbrella.config.z", -1.0F, 1.0F, () -> value().z(), v -> edit(value().withZ(v)), left, y + 72, 150);
 
         // Rotation column: left/right, forward/back and tilt.
-        addSlider("umbrella.config.yaw", -180.0F, 180.0F, () -> t.yaw, v -> t.yaw = v, right, y, 150);
-        addSlider("umbrella.config.pitch", -180.0F, 180.0F, () -> t.pitch, v -> t.pitch = v, right, y + 24, 150);
-        addSlider("umbrella.config.roll", -180.0F, 180.0F, () -> t.roll, v -> t.roll = v, right, y + 48, 150);
+        addSlider("umbrella.config.yaw", -180.0F, 180.0F, () -> value().yaw(), v -> edit(value().withYaw(v)), right, y, 150);
+        addSlider("umbrella.config.pitch", -180.0F, 180.0F, () -> value().pitch(), v -> edit(value().withPitch(v)), right, y + 24, 150);
+        addSlider("umbrella.config.roll", -180.0F, 180.0F, () -> value().roll(), v -> edit(value().withRoll(v)), right, y + 48, 150);
 
         Button rainButton = Button.builder(rainSoundLabel(), b -> {
             UmbrellaClientConfig.toggleRainSound();
@@ -91,7 +84,8 @@ public final class UmbrellaConfigScreen extends Screen {
 
         addRenderableWidget(Button.builder(Component.translatable("umbrella.config.reset"), b -> {
             UmbrellaClientConfig.reset(type);
-            if (minecraft != null) minecraft.setScreen(new UmbrellaConfigScreen(type, firstPerson));
+            transformChanged = true;
+            rebuildWidgets();
         }).bounds(cx - 105, y + 132, 96, 20).build());
         addRenderableWidget(Button.builder(Component.translatable("umbrella.config.done"), b -> onClose())
                 .bounds(cx + 9, y + 132, 96, 20).build());
@@ -102,8 +96,31 @@ public final class UmbrellaConfigScreen extends Screen {
                 ? "umbrella.config.first_person.world" : "umbrella.config.first_person.hand");
     }
 
-    private static UmbrellaTransform toTransform(UmbrellaClientConfig.Transform t) {
-        return new UmbrellaTransform(t.scale, t.x, t.y, t.z, t.yaw, t.pitch, t.roll);
+    private UmbrellaTransform value() {
+        return UmbrellaClientConfig.transform(type, firstPerson);
+    }
+
+    private void edit(UmbrellaTransform transform) {
+        UmbrellaClientConfig.setTransform(type, firstPerson, transform);
+        transformChanged = true;
+    }
+
+    private void selectEditingStack() {
+        editingHand = null;
+        editingStack = null;
+        if (minecraft == null || minecraft.player == null) return;
+        for (InteractionHand hand : InteractionHand.values()) {
+            ItemStack held = minecraft.player.getItemInHand(hand);
+            if (held.getItem() instanceof UmbrellaItem item && item.getUmbrellaType() == type) {
+                editingHand = hand;
+                editingStack = held;
+                return;
+            }
+        }
+    }
+
+    boolean isEditing(ItemStack stack) {
+        return transformChanged && stack == editingStack;
     }
 
     private static Component rainSoundLabel() {
@@ -119,7 +136,6 @@ public final class UmbrellaConfigScreen extends Screen {
                            Consumer<Float> setter, int x, int y, int width) {
         ConfigSlider slider = new ConfigSlider(x, y, width, 20,
                 Component.translatable(labelKey), min, max, getter, setter);
-        sliders.add(slider);
         addRenderableWidget(slider);
     }
 
@@ -128,20 +144,24 @@ public final class UmbrellaConfigScreen extends Screen {
         super.render(graphics, mouseX, mouseY, partialTick);
         graphics.drawCenteredString(this.font, this.title, this.width / 2, 4, 0xFFFFFF);
         graphics.drawCenteredString(this.font, Component.translatable("umbrella.config.hint"),
-                this.width / 2, 192, 0xA0A0A0);
+                this.width / 2, 214, 0xA0A0A0);
     }
 
     @Override
-    public void onClose() {
+    public void removed() {
+        saveChanges();
+        super.removed();
+    }
+
+    private void saveChanges() {
+        if (!transformChanged) return;
+        transformChanged = false;
         UmbrellaClientConfig.save();
-        if (editingStack != null && editingStack.getItem() instanceof UmbrellaItem) {
-            UmbrellaTransform held = toTransform(UmbrellaClientConfig.held(type));
-            UmbrellaTransform first = toTransform(UmbrellaClientConfig.first(type));
-            editingStack.set(ModComponents.UMBRELLA_HELD_TRANSFORM.get(), held);
-            editingStack.set(ModComponents.UMBRELLA_FIRST_TRANSFORM.get(), first);
-            ModNetwork.sendToServer(new TransformPayload(held, first));
+        if (editingHand != null && minecraft != null && minecraft.player != null && minecraft.getConnection() != null
+                && minecraft.player.getItemInHand(editingHand) == editingStack && UmbrellaItem.isUmbrella(editingStack)) {
+            ModNetwork.sendToServer(new TransformPayload(editingHand, BuiltInRegistries.ITEM.getKey(editingStack.getItem()),
+                    UmbrellaClientConfig.transform(type, false), UmbrellaClientConfig.transform(type, true)));
         }
-        if (minecraft != null) minecraft.setScreen(null);
     }
 
     @Override
@@ -180,7 +200,6 @@ public final class UmbrellaConfigScreen extends Screen {
         @Override
         protected void applyValue() {
             setter.accept(min + (float) value * (max - min));
-            UmbrellaClientConfig.save();
         }
     }
 }

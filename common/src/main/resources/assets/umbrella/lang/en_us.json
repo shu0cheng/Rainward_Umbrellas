@@ -20,7 +20,7 @@
   "umbrella.config.roll": "Tilt",
   "umbrella.config.reset": "Reset",
   "umbrella.config.done": "Done",
-  "umbrella.config.hint": "Changes are saved immediately. O to close after clicking Done.",
+  "umbrella.config.hint": "Changes are saved when you close this screen or switch umbrella types.",
   "umbrella.config.value": "%s: %s",
   "umbrella.config.type.telescopic": "Type: Telescopic",
   "umbrella.config.type.straight": "Type: Straight",

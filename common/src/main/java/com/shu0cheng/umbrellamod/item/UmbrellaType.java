@@ -71,6 +71,11 @@ public enum UmbrellaType {
         return id;
     }
 
+    public int animationTicks() {
+        // Rounded up from the GeckoLib animation lengths (0.60, 0.84 and 0.85 seconds).
+        return this == TELESCOPIC ? 12 : 17;
+    }
+
     public float canopyRadius() {
         return canopyRadius;
     }

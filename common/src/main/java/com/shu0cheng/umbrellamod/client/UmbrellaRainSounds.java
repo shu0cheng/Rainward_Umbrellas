@@ -6,13 +6,12 @@ import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.world.entity.player.Player;
 
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
 
 /** Keeps one rain-on-umbrella loop per nearby open umbrella. */
 public final class UmbrellaRainSounds {
+    private static final double HEARING_DISTANCE = 4.0;
     private static final Map<UUID, UmbrellaRainSound> ACTIVE = new HashMap<>();
 
     private UmbrellaRainSounds() {
@@ -26,63 +25,42 @@ public final class UmbrellaRainSounds {
             return;
         }
 
-        Set<UUID> desired = new HashSet<>();
-        {
+        ACTIVE.values().forEach(sound -> sound.setTargetVolume(0.0F));
+        if (mc.level.isRaining()) {
             for (Player player : mc.level.players()) {
-                if (player.isRemoved() || !isExposedOpenUmbrella(player)
+                boolean self = player == listener;
+                double distanceSquared = listener.distanceToSqr(player);
+                if (player.isRemoved() || distanceSquared >= HEARING_DISTANCE * HEARING_DISTANCE
+                        || (!UmbrellaItem.isOpen(player.getMainHandItem()) && !UmbrellaItem.isOpen(player.getOffhandItem()))
                         || !mc.level.isRainingAt(player.blockPosition().above())) {
                     continue;
                 }
-                boolean self = player == listener;
-                double distance = listener.distanceTo(player);
-                if (!self && distance >= 4.0) {
-                    continue;
-                }
-                float target = self ? 0.95F : 0.90F * (1.0F - (float) (distance / 4.0));
+                float target = self ? 0.95F : 0.90F * (1.0F - (float) (Math.sqrt(distanceSquared) / HEARING_DISTANCE));
                 if (target <= 0.005F) {
                     continue;
                 }
                 UUID id = player.getUUID();
-                desired.add(id);
                 UmbrellaRainSound sound = ACTIVE.get(id);
-                if (sound == null || sound.isStopped()) {
-                    sound = new UmbrellaRainSound(player, self);
+                if (sound == null || sound.isStopped() || sound.owner() != player) {
+                    if (sound != null) mc.getSoundManager().stop(sound);
+                    sound = new UmbrellaRainSound(player);
                     ACTIVE.put(id, sound);
                     mc.getSoundManager().play(sound);
                 }
-                sound.updatePosition(player);
+                sound.updatePosition();
                 sound.setTargetVolume(target);
             }
         }
 
         // Anything no longer desired fades out instead of stopping instantly.
         ACTIVE.entrySet().removeIf(entry -> {
-            if (desired.contains(entry.getKey())) {
-                return false;
-            }
             UmbrellaRainSound sound = entry.getValue();
-            if (sound.owner().level() != mc.level) {
-                sound.setTargetVolume(0.0F);
-                mc.getSoundManager().stop(sound);
-                return true;
-            }
-            sound.setTargetVolume(0.0F);
-            if (sound.isStopped() || sound.isFadedOut()) {
+            if (sound.owner().level() != mc.level || sound.isStopped() || sound.isFadedOut()) {
                 mc.getSoundManager().stop(sound);
                 return true;
             }
             return false;
         });
-    }
-
-    private static boolean isExposedOpenUmbrella(Player player) {
-        if (!UmbrellaItem.isOpen(player.getMainHandItem())
-                && !UmbrellaItem.isOpen(player.getOffhandItem())) {
-            return false;
-        }
-        // Use the same precipitation check as vanilla rain particles: biome
-        // precipitation + heightmap + dimension weather, not just isRaining().
-        return player.level().isRainingAt(player.blockPosition().above());
     }
 
     private static void stopAll(Minecraft mc) {

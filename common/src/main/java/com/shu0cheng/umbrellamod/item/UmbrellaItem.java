@@ -1,6 +1,7 @@
 package com.shu0cheng.umbrellamod.item;
 
-import com.shu0cheng.umbrellamod.UmbrellaMod;
+import com.shu0cheng.umbrellamod.block.PlacedUmbrellaBlockEntity;
+import com.shu0cheng.umbrellamod.client.UmbrellaAnimation;
 import com.shu0cheng.umbrellamod.registry.ModComponents;
 import com.shu0cheng.umbrellamod.registry.ModSounds;
 import software.bernie.geckolib.animatable.GeoItem;
@@ -8,14 +9,11 @@ import software.bernie.geckolib.animatable.client.GeoRenderProvider;
 import com.shu0cheng.umbrellamod.client.UmbrellaClient;
 import net.minecraft.client.renderer.BlockEntityWithoutLevelRenderer;
 import software.bernie.geckolib.animatable.instance.AnimatableInstanceCache;
-import software.bernie.geckolib.animatable.instance.SingletonAnimatableInstanceCache;
 import software.bernie.geckolib.animation.AnimatableManager;
 import software.bernie.geckolib.animation.AnimationController;
 import software.bernie.geckolib.animation.AnimationState;
 import software.bernie.geckolib.constant.DataTickets;
 import software.bernie.geckolib.animation.PlayState;
-import software.bernie.geckolib.animation.RawAnimation;
-import net.minecraft.world.item.ItemDisplayContext;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
 import net.minecraft.sounds.SoundEvents;
@@ -25,11 +23,12 @@ import net.minecraft.world.InteractionResultHolder;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.item.context.UseOnContext;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.util.Mth;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.Block;
 import com.shu0cheng.umbrellamod.block.ModBlocks;
 import com.shu0cheng.umbrellamod.block.PlacedUmbrellaBlock;
-import com.shu0cheng.umbrellamod.registry.ModItems;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.Item;
@@ -39,9 +38,6 @@ import net.minecraft.world.level.Level;
 
 import java.util.List;
 import java.util.function.Consumer;
-import java.util.Map;
-import java.util.EnumMap;
-import java.util.HashMap;
 
 /**
  * An umbrella.  Right click toggles between the folded (closed) and deployed
@@ -49,15 +45,7 @@ import java.util.HashMap;
  * inventory icon.
  */
 public class UmbrellaItem extends Item implements GeoItem {
-    private final AnimatableInstanceCache geoCache = new SingletonAnimatableInstanceCache(this);
-    private static final Map<UmbrellaType, Boolean> CLIENT_OPEN = new EnumMap<>(UmbrellaType.class);
-    private static final Map<Long, AnimPhase> ANIM_PHASES = new HashMap<>();
-    public static final ThreadLocal<Boolean> STATIC_RENDER = ThreadLocal.withInitial(() -> false);
-    private static final RawAnimation POSE_OPEN_ANIM = RawAnimation.begin().thenLoop("pose_open");
-    private static final RawAnimation POSE_CLOSED_ANIM = RawAnimation.begin().thenLoop("pose_closed");
-    private static final RawAnimation DISPLAY_OPEN_ANIM = RawAnimation.begin().thenLoop("display_open");
-    private static final RawAnimation OPEN_ANIM = RawAnimation.begin().thenPlayAndHold("open");
-    private static final RawAnimation CLOSE_ANIM = RawAnimation.begin().thenPlayAndHold("close");
+    private final UmbrellaAnimationCache geoCache = new UmbrellaAnimationCache(this);
     private final UmbrellaType type;
 
     public UmbrellaItem(UmbrellaType type, Properties properties) {
@@ -76,8 +64,8 @@ public class UmbrellaItem extends Item implements GeoItem {
         return geoCache;
     }
 
-    public AnimatableInstanceCache geoCache() {
-        return geoCache;
+    public void clearClientAnimationCache() {
+        geoCache.clear();
     }
 
     public UmbrellaType getUmbrellaType() {
@@ -101,8 +89,6 @@ public class UmbrellaItem extends Item implements GeoItem {
         }
         ItemStack stack = player.getItemInHand(hand);
         boolean open = isOpen(stack);
-        CLIENT_OPEN.put(type, !open);
-        UmbrellaAnimationAdapter.id(stack);
         if (!level.isClientSide) {
             stack.set(ModComponents.UMBRELLA_STATE.get(), new UmbrellaState(!open, level.getGameTime()));
             if (open) {
@@ -113,7 +99,7 @@ public class UmbrellaItem extends Item implements GeoItem {
             }
         }
         player.getCooldowns().addCooldown(this, 24);
-        return InteractionResultHolder.pass(stack);
+        return InteractionResultHolder.consume(stack);
     }
 
     @Override
@@ -124,20 +110,22 @@ public class UmbrellaItem extends Item implements GeoItem {
         }
         Level level = context.getLevel();
         ItemStack stack = context.getItemInHand();
-        BlockPos placePos = context.getClickedPos().relative(context.getClickedFace());
-        if (!level.getBlockState(placePos).canBeReplaced()) {
+        Direction face = context.getClickedFace();
+        BlockPos placePos = context.getClickedPos().relative(face);
+        if (level.isOutsideBuildHeight(placePos)
+                || !level.getWorldBorder().isWithinBounds(placePos)
+                || !level.mayInteract(player, placePos)
+                || !player.mayUseItemAt(placePos, face, stack)
+                || !level.getBlockState(placePos).canBeReplaced()) {
             return InteractionResult.FAIL;
         }
         boolean open = isOpen(stack);
         boolean inverted = open && player.getXRot() < -45.0F;
-        boolean leaning = !open && context.getClickedFace().getAxis().isHorizontal()
-                && level.getBlockState(placePos.below()).isSolid();
-        if (!inverted && !leaning && !level.getBlockState(placePos.below()).isSolid()) {
+        if (!inverted && !level.getBlockState(placePos.below()).isSolid()) {
             return InteractionResult.FAIL;
         }
-        boolean half = inverted
-                && context.getClickedFace() != net.minecraft.core.Direction.DOWN
-                && context.getClickedFace() != net.minecraft.core.Direction.UP
+        boolean leaning = !open && face.getAxis().isHorizontal();
+        boolean half = inverted && face.getAxis().isHorizontal()
                 && (context.getClickLocation().y - context.getClickedPos().getY()) < 0.5D;
         int rotation = Mth.floor((player.getYRot() + 180.0F) * 16.0F / 360.0F + 0.5F) & 15;
         BlockState state = ModBlocks.forType(type).defaultBlockState()
@@ -147,9 +135,13 @@ public class UmbrellaItem extends Item implements GeoItem {
                 .setValue(PlacedUmbrellaBlock.HALF, half)
                 .setValue(PlacedUmbrellaBlock.LEANING, leaning);
         if (!level.isClientSide) {
-            level.setBlock(placePos, state, 3);
-            level.playSound(null, placePos, state.getBlock().defaultBlockState().getSoundType().getPlaceSound(),
-                    net.minecraft.sounds.SoundSource.BLOCKS, 1.0F, 1.0F);
+            if (!level.setBlock(placePos, state, Block.UPDATE_ALL)) {
+                return InteractionResult.FAIL;
+            }
+            if (level.getBlockEntity(placePos) instanceof PlacedUmbrellaBlockEntity placed) {
+                placed.storeStack(stack);
+            }
+            level.playSound(null, placePos, state.getSoundType().getPlaceSound(), SoundSource.BLOCKS, 1.0F, 1.0F);
             if (!player.getAbilities().instabuild) {
                 stack.shrink(1);
             }
@@ -159,13 +151,13 @@ public class UmbrellaItem extends Item implements GeoItem {
 
     @Override
     public void onCraftedBy(ItemStack stack, Level level, Player player) {
-        stack.set(ModComponents.UMBRELLA_STATE.get(), new UmbrellaState(false, level.getGameTime()));
+        stack.set(ModComponents.UMBRELLA_STATE.get(), UmbrellaState.CLOSED);
     }
 
     @Override
     public void inventoryTick(ItemStack stack, Level level, Entity entity, int slot, boolean selected) {
         if (!stack.has(ModComponents.UMBRELLA_STATE.get()) && !level.isClientSide) {
-            stack.set(ModComponents.UMBRELLA_STATE.get(), new UmbrellaState(false, level.getGameTime()));
+            stack.set(ModComponents.UMBRELLA_STATE.get(), UmbrellaState.CLOSED);
         }
     }
 
@@ -188,45 +180,12 @@ public class UmbrellaItem extends Item implements GeoItem {
     }
 
     public static UmbrellaState getState(ItemStack stack) {
-        UmbrellaState state = stack.get(ModComponents.UMBRELLA_STATE.get());
-        return state == null ? new UmbrellaState(false, 0L) : state;
+        return stack.getOrDefault(ModComponents.UMBRELLA_STATE.get(), UmbrellaState.CLOSED);
     }
 
     private PlayState animationState(AnimationState<UmbrellaItem> state) {
-        ItemStack stack = state.getData(DataTickets.ITEMSTACK);
-        ItemDisplayContext context = state.getData(DataTickets.ITEM_RENDER_PERSPECTIVE);
-        if (context == ItemDisplayContext.FIXED || context == ItemDisplayContext.GUI) {
-            return state.setAndContinue(DISPLAY_OPEN_ANIM);
-        }
-        if (STATIC_RENDER.get()) {
-            boolean staticOpen = stack != null && isOpen(stack);
-            return state.setAndContinue(staticOpen ? POSE_OPEN_ANIM : POSE_CLOSED_ANIM);
-        }
-        boolean open = UmbrellaAnimationAdapter.open(stack);
-        long id = UmbrellaAnimationAdapter.id(stack);
-        AnimPhase phase = ANIM_PHASES.get(id);
-        if (phase == null) {
-            ANIM_PHASES.put(id, new AnimPhase(open));
-            return state.setAndContinue(open ? OPEN_ANIM : POSE_CLOSED_ANIM);
-        }
-        if (phase.open != open) {
-            phase.open = open;
-        }
-        // Holding the last frame avoids returning to an empty/default pose after
-        // the one-shot animation finishes.
-        return state.setAndContinue(open ? OPEN_ANIM : CLOSE_ANIM);
-    }
-
-    private static final class AnimPhase {
-        boolean open;
-
-        AnimPhase(boolean open) {
-            this.open = open;
-        }
-    }
-
-    public static boolean isClientOpen(UmbrellaType type) {
-        return CLIENT_OPEN.getOrDefault(type, false);
+        return state.setAndContinue(UmbrellaAnimation.animation(type, state.getData(DataTickets.ITEMSTACK),
+                state.getData(DataTickets.ITEM_RENDER_PERSPECTIVE)));
     }
 
     public static boolean isUmbrella(ItemStack stack) {

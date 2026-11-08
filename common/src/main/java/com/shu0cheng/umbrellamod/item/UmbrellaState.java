@@ -13,6 +13,8 @@ import net.minecraft.network.codec.StreamCodec;
  * @param changedAt game time of the last toggle, used by the client for the animation
  */
 public record UmbrellaState(boolean open, long changedAt) {
+    public static final UmbrellaState CLOSED = new UmbrellaState(false, -1L);
+
     public static final Codec<UmbrellaState> CODEC = RecordCodecBuilder.create(instance -> instance.group(
             Codec.BOOL.fieldOf("open").forGetter(UmbrellaState::open),
             Codec.LONG.fieldOf("changed_at").forGetter(UmbrellaState::changedAt)

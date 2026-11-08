@@ -2,8 +2,9 @@ package com.shu0cheng.umbrellamod.block;
 
 import com.mojang.serialization.MapCodec;
 import com.shu0cheng.umbrellamod.item.UmbrellaType;
+import com.shu0cheng.umbrellamod.item.UmbrellaState;
+import com.shu0cheng.umbrellamod.registry.ModComponents;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
 import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.block.BaseEntityBlock;
 import net.minecraft.world.level.block.Block;
@@ -70,15 +71,16 @@ public class PlacedUmbrellaBlock extends BaseEntityBlock {
 
     @Override
     public void playerDestroy(Level level, Player player, BlockPos pos, BlockState state,
-                              net.minecraft.world.level.block.entity.BlockEntity blockEntity,
+                              BlockEntity blockEntity,
                               ItemStack tool) {
         if (!level.isClientSide) {
-            ItemStack drop = new ItemStack(ModItems.itemFor(type));
-            if (state.getValue(OPEN)) {
-                drop.set(com.shu0cheng.umbrellamod.registry.ModComponents.UMBRELLA_STATE.get(),
-                        new com.shu0cheng.umbrellamod.item.UmbrellaState(true, level.getGameTime()));
+            ItemStack drop = blockEntity instanceof PlacedUmbrellaBlockEntity placed
+                    ? placed.copyStoredStack() : ItemStack.EMPTY;
+            if (!drop.is(ModItems.itemFor(type))) {
+                drop = new ItemStack(ModItems.itemFor(type));
             }
-            net.minecraft.world.level.block.Block.popResource(level, pos, drop);
+            drop.set(ModComponents.UMBRELLA_STATE.get(), new UmbrellaState(state.getValue(OPEN), -1L));
+            Block.popResource(level, pos, drop);
         }
         super.playerDestroy(level, player, pos, state, blockEntity, tool);
     }

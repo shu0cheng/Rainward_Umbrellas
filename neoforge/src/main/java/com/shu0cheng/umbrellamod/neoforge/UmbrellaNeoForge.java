@@ -1,8 +1,6 @@
 package com.shu0cheng.umbrellamod.neoforge;
 
 import com.shu0cheng.umbrellamod.UmbrellaMod;
-import com.shu0cheng.umbrellamod.network.SwitchHandPayload;
-import com.shu0cheng.umbrellamod.network.ToggleUmbrellaPayload;
 import com.shu0cheng.umbrellamod.network.TransformPayload;
 import com.shu0cheng.umbrellamod.platform.Services;
 import net.minecraft.server.level.ServerPlayer;
@@ -22,15 +20,7 @@ public final class UmbrellaNeoForge {
     }
 
     private static void registerNetwork(RegisterPayloadHandlersEvent event) {
-        var registrar = event.registrar("1");
-        registrar.playToServer(SwitchHandPayload.TYPE, SwitchHandPayload.STREAM_CODEC,
-                (payload, context) -> context.enqueueWork(() -> {
-                    if (context.player() instanceof ServerPlayer player) SwitchHandPayload.handle(payload, player);
-                }));
-        registrar.playToServer(ToggleUmbrellaPayload.TYPE, ToggleUmbrellaPayload.STREAM_CODEC,
-                (payload, context) -> context.enqueueWork(() -> {
-                    if (context.player() instanceof ServerPlayer player) ToggleUmbrellaPayload.handle(payload, player);
-                }));
+        var registrar = event.registrar("2");
         registrar.playToServer(TransformPayload.TYPE, TransformPayload.STREAM_CODEC,
                 (payload, context) -> context.enqueueWork(() -> {
                     if (context.player() instanceof ServerPlayer player) TransformPayload.handle(payload, player);

@@ -3,7 +3,6 @@ package com.shu0cheng.umbrellamod.client;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.shu0cheng.umbrellamod.UmbrellaMod;
 import com.shu0cheng.umbrellamod.item.UmbrellaItem;
-import com.shu0cheng.umbrellamod.item.UmbrellaAnimationAdapter;
 import com.shu0cheng.umbrellamod.item.UmbrellaTransform;
 import com.shu0cheng.umbrellamod.registry.ModComponents;
 import net.minecraft.client.renderer.MultiBufferSource;
@@ -34,7 +33,7 @@ public class UmbrellaGeoRenderer extends GeoItemRenderer<UmbrellaItem> {
                               MultiBufferSource buffer, int light, int overlay) {
         this.animatable = item;
         this.currentItemStack = stack;
-        this.renderPerspective = ItemDisplayContext.FIRST_PERSON_RIGHT_HAND;
+        this.renderPerspective = ItemDisplayContext.NONE;
         RenderType type = getRenderType(item, getTextureLocation(item), buffer, 0.0F);
         VertexConsumer vc = buffer.getBuffer(type);
         defaultRender(pose, item, buffer, type, vc, 0.0F, 0.0F, light);
@@ -61,7 +60,7 @@ public class UmbrellaGeoRenderer extends GeoItemRenderer<UmbrellaItem> {
         boolean firstPerson = renderPerspective == ItemDisplayContext.FIRST_PERSON_RIGHT_HAND
                 || renderPerspective == ItemDisplayContext.FIRST_PERSON_LEFT_HAND;
         if (!firstPerson || currentItemStack == null) return;
-        if (!UmbrellaAnimationAdapter.open(currentItemStack)) return;
+        if (!UmbrellaItem.isOpen(currentItemStack)) return;
         Minecraft mc = Minecraft.getInstance();
         if (mc.player == null) return;
         // Cancel the camera pitch, keep yaw; rotate around the model origin (grip).
@@ -82,54 +81,41 @@ public class UmbrellaGeoRenderer extends GeoItemRenderer<UmbrellaItem> {
 
     @Override
     public long getInstanceId(UmbrellaItem animatable) {
-        long id = UmbrellaAnimationAdapter.id(currentItemStack);
-        if (renderPerspective == ItemDisplayContext.FIXED || renderPerspective == ItemDisplayContext.GUI) {
-            return Long.MIN_VALUE + id;
-        }
-        return id;
+        return UmbrellaAnimation.instanceId(animatable.getUmbrellaType(), currentItemStack, renderPerspective);
     }
 
     @Override
     public void renderByItem(ItemStack stack, ItemDisplayContext context, PoseStack pose,
                              MultiBufferSource buffer, int light, int overlay) {
-        boolean fixed = context == ItemDisplayContext.FIXED;
-        UmbrellaItem.STATIC_RENDER.set(fixed);
         boolean firstPerson = context == ItemDisplayContext.FIRST_PERSON_RIGHT_HAND
                 || context == ItemDisplayContext.FIRST_PERSON_LEFT_HAND;
         boolean thirdPerson = context == ItemDisplayContext.THIRD_PERSON_RIGHT_HAND
                 || context == ItemDisplayContext.THIRD_PERSON_LEFT_HAND;
         pose.pushPose();
-        if (firstPerson || thirdPerson) {
-            UmbrellaTransform net = firstPerson
-                    ? stack.get(ModComponents.UMBRELLA_FIRST_TRANSFORM.get())
-                    : stack.get(ModComponents.UMBRELLA_HELD_TRANSFORM.get());
-            boolean local = net != null || (Minecraft.getInstance().player != null
-                    && (stack == Minecraft.getInstance().player.getMainHandItem()
-                    || stack == Minecraft.getInstance().player.getOffhandItem()));
-            if (local) {
-                float scale, x, y, z, yaw, pitch, roll;
-                if (net != null) {
-                    scale = net.scale(); x = net.x(); y = net.y(); z = net.z();
-                    yaw = net.yaw(); pitch = net.pitch(); roll = net.roll();
-                } else {
-                    UmbrellaClientConfig.Transform t = firstPerson
-                            ? UmbrellaClientConfig.first(((UmbrellaItem) stack.getItem()).getUmbrellaType())
-                            : UmbrellaClientConfig.held(((UmbrellaItem) stack.getItem()).getUmbrellaType());
-                    scale = t.scale; x = t.x; y = t.y; z = t.z;
-                    yaw = t.yaw; pitch = t.pitch; roll = t.roll;
-                }
-                pose.translate(x, y, z);
-                pose.mulPose(Axis.YP.rotationDegrees(yaw));
-                pose.mulPose(Axis.XP.rotationDegrees(pitch));
-                pose.mulPose(Axis.ZP.rotationDegrees(roll));
-                pose.scale(scale, scale, scale);
-            }
-        }
         try {
+            if (firstPerson || thirdPerson) {
+                UmbrellaTransform transform = heldTransform(stack, firstPerson);
+                if (transform != null && !UmbrellaTransform.IDENTITY.equals(transform)) {
+                    pose.translate(transform.x(), transform.y(), transform.z());
+                    pose.mulPose(Axis.YP.rotationDegrees(transform.yaw()));
+                    pose.mulPose(Axis.XP.rotationDegrees(transform.pitch()));
+                    pose.mulPose(Axis.ZP.rotationDegrees(transform.roll()));
+                    pose.scale(transform.scale(), transform.scale(), transform.scale());
+                }
+            }
             super.renderByItem(stack, context, pose, buffer, light, overlay);
         } finally {
-            UmbrellaItem.STATIC_RENDER.set(false);
             pose.popPose();
         }
+    }
+
+    private static UmbrellaTransform heldTransform(ItemStack stack, boolean firstPerson) {
+        Minecraft mc = Minecraft.getInstance();
+        boolean local = mc.player != null && (stack == mc.player.getMainHandItem() || stack == mc.player.getOffhandItem());
+        boolean preview = local && mc.screen instanceof UmbrellaConfigScreen screen && screen.isEditing(stack);
+        UmbrellaTransform synced = firstPerson ? stack.get(ModComponents.UMBRELLA_FIRST_TRANSFORM.get())
+                : stack.get(ModComponents.UMBRELLA_HELD_TRANSFORM.get());
+        if (!preview && synced != null && synced.isValid(1.0F)) return synced;
+        return local ? UmbrellaClientConfig.transform(((UmbrellaItem) stack.getItem()).getUmbrellaType(), firstPerson) : null;
     }
 }

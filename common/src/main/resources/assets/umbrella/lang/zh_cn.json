@@ -20,7 +20,7 @@
   "umbrella.config.roll": "倾斜角度",
   "umbrella.config.reset": "重置",
   "umbrella.config.done": "完成",
-  "umbrella.config.hint": "调整会立即保存；点完成后按 O 关闭。",
+  "umbrella.config.hint": "关闭界面或切换伞型时保存调整。",
   "umbrella.config.value": "%s：%s",
   "umbrella.config.type.telescopic": "类型：伸缩伞",
   "umbrella.config.type.straight": "类型：直杆伞",

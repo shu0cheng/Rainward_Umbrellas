@@ -15,7 +15,9 @@ public final class UmbrellaFabricClient implements ClientModInitializer {
     @Override
     public void onInitializeClient() {
         UmbrellaClient.init();
-        ModNetwork.setClientSender(ClientPlayNetworking::send);
+        ModNetwork.setClientSender(payload -> {
+            if (ClientPlayNetworking.canSend(payload.type())) ClientPlayNetworking.send(payload);
+        });
         KeyBindingHelper.registerKeyBinding(UmbrellaClient.OPEN_CONFIG);
         KeyBindingHelper.registerKeyBinding(UmbrellaClient.DEV_TUNER);
         BlockEntityRendererRegistry.register(ModBlockEntities.PLACED_UMBRELLA.get(), PlacedUmbrellaRenderer::new);

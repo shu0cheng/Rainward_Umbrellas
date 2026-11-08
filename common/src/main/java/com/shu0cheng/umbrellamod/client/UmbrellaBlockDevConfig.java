@@ -3,6 +3,8 @@ package com.shu0cheng.umbrellamod.client;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonObject;
+import com.shu0cheng.umbrellamod.UmbrellaMod;
+import com.shu0cheng.umbrellamod.item.UmbrellaTransform;
 import com.shu0cheng.umbrellamod.item.UmbrellaType;
 import com.shu0cheng.umbrellamod.platform.Services;
 
@@ -20,18 +22,7 @@ import java.util.Map;
 public final class UmbrellaBlockDevConfig {
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
     private static final Path FILE = Services.PLATFORM.configDirectory().resolve("umbrella-block-dev.json");
-    private static final Map<String, T> VALUES = new LinkedHashMap<>();
-
-    public record T(float x, float y, float z, float yaw, float pitch, float roll, float scale) {
-        public static final T ZERO = new T(0, 0, 0, 0, 0, 0, 1);
-        public T withX(float v) { return new T(v, y, z, yaw, pitch, roll, scale); }
-        public T withY(float v) { return new T(x, v, z, yaw, pitch, roll, scale); }
-        public T withZ(float v) { return new T(x, y, v, yaw, pitch, roll, scale); }
-        public T withYaw(float v) { return new T(x, y, z, v, pitch, roll, scale); }
-        public T withPitch(float v) { return new T(x, y, z, yaw, v, roll, scale); }
-        public T withRoll(float v) { return new T(x, y, z, yaw, pitch, v, scale); }
-        public T withScale(float v) { return new T(x, y, z, yaw, pitch, roll, v); }
-    }
+    private static final Map<String, UmbrellaTransform> VALUES = new LinkedHashMap<>();
 
     private UmbrellaBlockDevConfig() {
     }
@@ -40,16 +31,17 @@ public final class UmbrellaBlockDevConfig {
         return type.id() + "|" + open + "|" + inverted + "|" + half + "|" + leaning + "|" + variant;
     }
 
-    public static boolean has(UmbrellaType type, boolean open, boolean inverted, boolean half, boolean leaning, String variant) {
-        return VALUES.containsKey(key(type, open, inverted, half, leaning, variant));
+    public static UmbrellaTransform get(UmbrellaType type, boolean open, boolean inverted, boolean half, boolean leaning, String variant) {
+        String key = key(type, open, inverted, half, leaning, variant);
+        UmbrellaTransform override = VALUES.get(key);
+        return override != null ? override : PlacedUmbrellaDefaults.get(key);
     }
 
-    public static T get(UmbrellaType type, boolean open, boolean inverted, boolean half, boolean leaning, String variant) {
-        return VALUES.getOrDefault(key(type, open, inverted, half, leaning, variant), T.ZERO);
-    }
-
-    public static void set(UmbrellaType type, boolean open, boolean inverted, boolean half, boolean leaning, String variant, T value) {
+    public static boolean set(UmbrellaType type, boolean open, boolean inverted, boolean half, boolean leaning,
+                              String variant, UmbrellaTransform value) {
+        if (!value.isValid(2.0F)) return false;
         VALUES.put(key(type, open, inverted, half, leaning, variant), value);
+        return true;
     }
 
     public static String variant(int rotation) {
@@ -63,11 +55,13 @@ public final class UmbrellaBlockDevConfig {
             if (root == null) return;
             for (String key : root.keySet()) {
                 JsonObject o = root.getAsJsonObject(key);
-                VALUES.put(key, new T(o.get("x").getAsFloat(), o.get("y").getAsFloat(), o.get("z").getAsFloat(),
-                        o.get("yaw").getAsFloat(), o.get("pitch").getAsFloat(), o.get("roll").getAsFloat(),
-                        o.get("scale").getAsFloat()));
+                UmbrellaTransform value = new UmbrellaTransform(o.get("scale").getAsFloat(), o.get("x").getAsFloat(),
+                        o.get("y").getAsFloat(), o.get("z").getAsFloat(), o.get("yaw").getAsFloat(),
+                        o.get("pitch").getAsFloat(), o.get("roll").getAsFloat());
+                if (value.isValid(2.0F)) VALUES.put(key, value);
             }
-        } catch (Exception ignored) {
+        } catch (Exception e) {
+            UmbrellaMod.LOGGER.warn("Could not read umbrella placement settings", e);
         }
     }
 
@@ -76,15 +70,16 @@ public final class UmbrellaBlockDevConfig {
             JsonObject root = new JsonObject();
             for (var e : VALUES.entrySet()) {
                 JsonObject o = new JsonObject();
-                T t = e.getValue();
-                o.addProperty("x", t.x); o.addProperty("y", t.y); o.addProperty("z", t.z);
-                o.addProperty("yaw", t.yaw); o.addProperty("pitch", t.pitch); o.addProperty("roll", t.roll);
-                o.addProperty("scale", t.scale);
+                UmbrellaTransform t = e.getValue();
+                o.addProperty("x", t.x()); o.addProperty("y", t.y()); o.addProperty("z", t.z());
+                o.addProperty("yaw", t.yaw()); o.addProperty("pitch", t.pitch()); o.addProperty("roll", t.roll());
+                o.addProperty("scale", t.scale());
                 root.add(e.getKey(), o);
             }
             Files.createDirectories(FILE.getParent());
             Files.writeString(FILE, GSON.toJson(root));
-        } catch (Exception ignored) {
+        } catch (Exception e) {
+            UmbrellaMod.LOGGER.warn("Could not save umbrella placement settings", e);
         }
     }
 
@@ -93,11 +88,11 @@ public final class UmbrellaBlockDevConfig {
         StringBuilder b = new StringBuilder();
         b.append("// generated by UmbrellaBlockDevScreen - DEV ONLY\n");
         for (var e : VALUES.entrySet()) {
-            T t = e.getValue();
-            b.append("case \"").append(e.getKey()).append("\" -> new Vec3(")
-                    .append(t.x).append("F, ").append(t.y).append("F, ").append(t.z)
-                    .append("F); // yaw=").append(t.yaw).append(" pitch=").append(t.pitch)
-                    .append(" roll=").append(t.roll).append(" scale=").append(t.scale).append('\n');
+            UmbrellaTransform t = e.getValue();
+            b.append("MAP.put(\"").append(e.getKey()).append("\", new UmbrellaTransform(")
+                    .append(t.scale()).append("F, ").append(t.x()).append("F, ").append(t.y()).append("F, ")
+                    .append(t.z()).append("F, ").append(t.yaw()).append("F, ").append(t.pitch()).append("F, ")
+                    .append(t.roll()).append("F));\n");
         }
         return b.toString();
     }

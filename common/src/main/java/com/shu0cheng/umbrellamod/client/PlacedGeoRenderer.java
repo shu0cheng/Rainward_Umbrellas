@@ -11,8 +11,16 @@ import software.bernie.geckolib.renderer.GeoItemRenderer;
 
 /** Static block-model renderer used by placed umbrellas. */
 public class PlacedGeoRenderer extends GeoItemRenderer<UmbrellaItem> {
+    private final long poseId;
+
     public PlacedGeoRenderer(String type, boolean inverted) {
         super(new PlacedUmbrellaGeoModel(type, inverted));
+        poseId = inverted ? -5L : -4L;
+    }
+
+    @Override
+    public long getInstanceId(UmbrellaItem item) {
+        return poseId;
     }
 
     public void renderInWorld(PoseStack pose, UmbrellaItem item, ItemStack stack,

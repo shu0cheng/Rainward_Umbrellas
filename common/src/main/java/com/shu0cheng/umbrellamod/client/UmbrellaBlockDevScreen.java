@@ -1,5 +1,6 @@
 package com.shu0cheng.umbrellamod.client;
 
+import com.shu0cheng.umbrellamod.item.UmbrellaTransform;
 import com.shu0cheng.umbrellamod.item.UmbrellaType;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.AbstractSliderButton;
@@ -8,8 +9,6 @@ import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Locale;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
@@ -26,7 +25,7 @@ public final class UmbrellaBlockDevScreen extends Screen {
     private final UmbrellaType type;
     private final int mode;
     private final int selector;
-    private final List<DevSlider> sliders = new ArrayList<>();
+    private boolean changed;
     private EditBox input;
 
     public UmbrellaBlockDevScreen(UmbrellaType type, int mode, int selector) {
@@ -52,7 +51,7 @@ public final class UmbrellaBlockDevScreen extends Screen {
         return mode == 2;
     }
 
-    private UmbrellaBlockDevConfig.T value() {
+    private UmbrellaTransform value() {
         return UmbrellaBlockDevConfig.get(type, open(), inverted(), half(), leaning(), variant());
     }
 
@@ -88,14 +87,13 @@ public final class UmbrellaBlockDevScreen extends Screen {
         }).bounds(left, 40, 145, 20).build());
         }
 
-        UmbrellaBlockDevConfig.T t = value();
-        addSlider("X", -2, 2, t::x, v -> set(v0 -> v0.withX(v)), left, y);
-        addSlider("Y", -2, 2, t::y, v -> set(v0 -> v0.withY(v)), left, y + 22);
-        addSlider("Z", -2, 2, t::z, v -> set(v0 -> v0.withZ(v)), left, y + 44);
-        addSlider("Yaw", -180, 180, t::yaw, v -> set(v0 -> v0.withYaw(v)), right, y);
-        addSlider("Pitch", -180, 180, t::pitch, v -> set(v0 -> v0.withPitch(v)), right, y + 22);
-        addSlider("Roll", -180, 180, t::roll, v -> set(v0 -> v0.withRoll(v)), right, y + 44);
-        addSlider("Scale", 0.1f, 3.0f, t::scale, v -> set(v0 -> v0.withScale(v)), left, y + 88);
+        addSlider("X", -2, 2, () -> value().x(), v -> set(value().withX(v)), left, y);
+        addSlider("Y", -2, 2, () -> value().y(), v -> set(value().withY(v)), left, y + 22);
+        addSlider("Z", -2, 2, () -> value().z(), v -> set(value().withZ(v)), left, y + 44);
+        addSlider("Yaw", -180, 180, () -> value().yaw(), v -> set(value().withYaw(v)), right, y);
+        addSlider("Pitch", -180, 180, () -> value().pitch(), v -> set(value().withPitch(v)), right, y + 22);
+        addSlider("Roll", -180, 180, () -> value().roll(), v -> set(value().withRoll(v)), right, y + 44);
+        addSlider("Scale", 0.1f, 3.0f, () -> value().scale(), v -> set(value().withScale(v)), left, y + 88);
 
         input = new EditBox(font, left, y + 116, 300, 20,
                 Component.literal("x,y,z,yaw,pitch,roll,scale"));
@@ -111,29 +109,27 @@ public final class UmbrellaBlockDevScreen extends Screen {
             if (minecraft != null) minecraft.setScreen(new UmbrellaBlockDevScreen(type, mode, selector));
         }).bounds(left + 102, y + 140, 96, 20).build());
         addRenderableWidget(Button.builder(Component.literal("复制 Java"), b -> {
-            UmbrellaBlockDevConfig.save();
+            saveChanges();
             if (minecraft != null) minecraft.keyboardHandler.setClipboard(UmbrellaBlockDevConfig.javaCode());
         }).bounds(left + 204, y + 140, 96, 20).build());
 
-        addRenderableWidget(Button.builder(Component.literal("保存为默认"), b -> UmbrellaBlockDevConfig.save())
+        addRenderableWidget(Button.builder(Component.literal("保存调整"), b -> saveChanges())
                 .bounds(left, y + 164, 145, 20).build());
         addRenderableWidget(Button.builder(Component.literal("完成"), b -> onClose())
                 .bounds(left + 155, y + 164, 145, 20).build());
     }
 
-    private void set(java.util.function.UnaryOperator<UmbrellaBlockDevConfig.T> op) {
-        UmbrellaBlockDevConfig.set(type, open(), inverted(), half(), leaning(), variant(), op.apply(value()));
-        UmbrellaBlockDevConfig.save();
+    private void set(UmbrellaTransform value) {
+        changed |= UmbrellaBlockDevConfig.set(type, open(), inverted(), half(), leaning(), variant(), value);
     }
 
     private void addSlider(String label, float min, float max, Supplier<Float> getter,
                            Consumer<Float> setter, int x, int y) {
         DevSlider slider = new DevSlider(x, y, 145, 20, Component.literal(label), min, max, getter, setter);
-        sliders.add(slider);
         addRenderableWidget(slider);
     }
 
-    private static String csv(UmbrellaBlockDevConfig.T t) {
+    private static String csv(UmbrellaTransform t) {
         return String.format(Locale.ROOT, "%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f",
                 t.x(), t.y(), t.z(), t.yaw(), t.pitch(), t.roll(), t.scale());
     }
@@ -142,12 +138,9 @@ public final class UmbrellaBlockDevScreen extends Screen {
         try {
             String[] p = input.getValue().split("[,\\s]+");
             if (p.length < 7) return;
-            UmbrellaBlockDevConfig.set(type, open(), inverted(), half(), leaning(), variant(),
-                    new UmbrellaBlockDevConfig.T(Float.parseFloat(p[0]), Float.parseFloat(p[1]),
-                            Float.parseFloat(p[2]), Float.parseFloat(p[3]), Float.parseFloat(p[4]),
-                            Float.parseFloat(p[5]), Float.parseFloat(p[6])));
-            UmbrellaBlockDevConfig.save();
-        } catch (Exception ignored) {
+            set(new UmbrellaTransform(Float.parseFloat(p[6]), Float.parseFloat(p[0]), Float.parseFloat(p[1]),
+                    Float.parseFloat(p[2]), Float.parseFloat(p[3]), Float.parseFloat(p[4]), Float.parseFloat(p[5])));
+        } catch (NumberFormatException ignored) {
         }
     }
 
@@ -160,9 +153,16 @@ public final class UmbrellaBlockDevScreen extends Screen {
     }
 
     @Override
-    public void onClose() {
-        UmbrellaBlockDevConfig.save();
-        if (minecraft != null) minecraft.setScreen(null);
+    public void removed() {
+        saveChanges();
+        super.removed();
+    }
+
+    private void saveChanges() {
+        if (changed) {
+            UmbrellaBlockDevConfig.save();
+            changed = false;
+        }
     }
 
     @Override
